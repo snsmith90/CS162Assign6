@@ -1,0 +1,28 @@
+var obj, x, fun, outObj in
+x := 1000;
+outObj := {counter : 0 };
+ 
+while (0 <= x) {
+  obj := { 
+    moo : 5, 
+    foo : 1, 
+    bar : (a, b, c, d) => {
+      output a.foo;
+      output b;
+      a := c();
+      output a.fld.innerFld;
+      a.fld.innerClos();
+      a.clos();
+      output d
+    } 
+  };
+  fun := () => { output "It's Friday! Fun! Fun! Fun!"; {fld : {innerFld : 3, innerClos: () => {output x}}, clos : () => {output outObj.counter} } };
+  output obj.moo;
+  obj.bar({foo : 4}, obj.bar, fun, 42);
+  outObj.counter := outObj.counter + obj.foo;
+  x := x - 1
+};
+
+output outObj.counter
+
+

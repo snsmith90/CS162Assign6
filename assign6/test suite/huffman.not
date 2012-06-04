@@ -1,0 +1,110 @@
+<< takes a set of symbols and their weights (a measure of frequency)
+   and performs Huffman Encoding to generate a prefix code for each
+   symbol.
+>>
+
+var sortedList, huffNode, get_symw, buildTree, symw, list in
+
+sortedList := {
+  head : undef,
+  tail : undef,
+
+  getTail : () => 
+  {
+    if ( self.tail = undef ) self.tail := { proto: sortedList };
+    self.tail
+  },
+
+  isEmpty : () => { self.head = undef },
+
+  insert : (x) => 
+  {
+    if ( self.head = undef ) self.head := x
+    else if ( self.head.getValue() <= x.getValue() )
+      self.getTail().insert(x)
+    else {
+      var tmp in
+      tmp := self.head;
+      self.head := x;
+      self.tail := { head: tmp, tail: self.tail, proto: sortedList }
+    }
+  },
+
+  popMin : () =>
+  {
+    var min in
+    min := self.head;
+    if ( self.tail != undef ) {
+      self.head := self.tail.head;
+      self.tail := self.tail.tail
+    }
+    else self.head := undef;
+    min
+  },
+
+  print : () => 
+  {
+    if ( self.head != undef ) {
+      output self.head;
+      if ( self.tail != undef ) self.tail.print()
+    }
+  }
+};
+
+huffNode := {
+  symbol : "",
+  weight : 0,
+  left   : undef,
+  right  : undef,
+
+  getValue : () => { self.weight },
+
+  print : (code) =>
+  {
+    if ( self.symbol = "" ) {
+      if ( self.left != undef ) self.left.print(code + "0");
+      if ( self.right != undef ) self.right.print(code + "1")
+    }
+    else output self.symbol + " = " + code
+  }
+};
+
+get_symw := () =>
+{
+  var sym, weight in
+
+  output "next symbol (<enter> to stop):";
+  sym := input str;
+
+  if ( sym != "" ) {
+    output "symbol's weight?";
+    weight := input num
+  };
+
+  { symbol : sym, weight : weight, proto : huffNode }  
+};
+
+buildTree := (list) =>
+{
+  var min1, min2, newNode in
+
+  min1 := list.popMin();
+  if ( list.isEmpty() ) min1
+  else {
+    min2 := list.popMin();
+    newNode := { weight: min1.weight + min2.weight,
+                 left: min1, right: min2, proto: huffNode };
+    list.insert(newNode);
+    buildTree(list)
+  }
+};
+
+list := { proto: sortedList };
+
+symw := get_symw();
+while ( symw.symbol != "" ) {
+  list.insert(symw);
+  symw := get_symw()
+};
+
+buildTree(list).print("")

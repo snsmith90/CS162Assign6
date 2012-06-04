@@ -1,0 +1,5 @@
+var x in
+  x := {bar:() => {output x.foo}};
+  x.foo := 3;
+  x.bar()
+  

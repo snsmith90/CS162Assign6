@@ -1,0 +1,7 @@
+var x, y in
+  x := {foo: {bar:1}};
+  y := x.foo;
+  output y.bar;
+  y.bar := 10;
+  output y.bar;
+  output x.foo.bar
