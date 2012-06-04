@@ -1,0 +1,20 @@
+These files implement the miniJS language interpreter.
+
+– MANIFEST –
+
+README			: this file
+interpreter.scala	: the main entry point
+syntax.scala		: defines the language AST and parser
+values.scala		: defines the language values
+domains.scala		: defines the store and environment classes
+gc.scala		: defines template for garbage collector
+
+makefile		: rules for building the interpreter
+build/			: where the compiled binaries go
+test suite/		: a set of test programs
+
+– TO COMPILE AND RUN –
+
+1. make
+2. cd build/
+3. scala miniJS -gc (stub|semi) -heap <heap size> [-trace] <program>
