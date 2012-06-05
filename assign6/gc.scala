@@ -2,7 +2,7 @@ package cs162.miniJS.gc
 
 import cs162.miniJS.values._
 import cs162.miniJS.domains.Domains._
-import cs162.miniJS.domains.{ gEnv, gStore }
+import cs162.miniJS.domains.{ gEnv, gStore, FreshRef }
 
 // out of memory exception
 case object OOM extends Exception( "Out of memory" )
@@ -166,6 +166,9 @@ trait TracingCollector {
 
   def rootSet(): Set[ Ref ] = {
     // FILL ME
+	//trace("In rootSet")
+	val x = Set( FreshRef.getNext )
+	x
   }
 
 }
@@ -255,6 +258,9 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     // 'gEnv', meaning that you may come across a address when
     // traversing 'gEnv' that you've already updated (so don't trace
     // it, because it will already point into 'to space')
+	
+	trace("In doGC() what is in gEnv " + gEnv)
+	
   }
   
   // recursively copies from the given address
@@ -285,6 +291,8 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     //
     // 6. now write the updated object to its address in 'to space'
     //    and return its new address location
+	trace("In traceCopy ")
+	0
   }
   
   
@@ -308,8 +316,20 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     //    2c. if not, throw OOM exception
     // 3. write the object to memory (including meta-data)
     // 4. return the address of the object
-  
-    
+	
+	trace("In gcAlloc need " + fullSize)
+	//check if from space has enough memory
+	if(fullSize > (toStart-fromStart)){
+		//collect heap
+		//check mem now
+		//throw OOM exception
+		throw OOM
+	}
+	else {
+		writeObjectBytes(fromStart + fullSize, asBytes)
+		Address(fromStart + fullSize)
+	}
+	
   } // gcAlloc
   
   // GC Read function
