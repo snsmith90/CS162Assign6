@@ -1,3 +1,7 @@
 ## gcAlloc: allocating space for ListNil
 In gcAlloc need 54
-## gcRead: reading a54
+## gcRead: reading a0
+a.loc is 0
+In read obj
+Amt of bytes is [B@1deeb40
+Byte array java.io.ByteArrayInputStream@cafb56

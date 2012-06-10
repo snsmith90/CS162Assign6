@@ -3,6 +3,8 @@ package cs162.miniJS.gc
 import cs162.miniJS.values._
 import cs162.miniJS.domains.Domains._
 import cs162.miniJS.domains.{ gEnv, gStore, FreshRef }
+import scala.collection.mutable.{ Stack }
+import scala.collection.immutable.{ Set }
 
 // out of memory exception
 case object OOM extends Exception( "Out of memory" )
@@ -68,13 +70,17 @@ abstract class Collector( val maxSize: Int ) {
   }
 
   def writeBytes( index: Int, bytes: Array[ Byte ] ) {
+	trace("in writeBytes given index " + index + "and bytes " + bytes)
     bytes.copyToArray( heap, index, bytes.size )
   }
 
   // read a memory object (which is 'size' bytes long) from the heap
   def readObject(idx:Int, size:Int) : Object = {
+	trace("In read obj")
     val bytes = heap.slice(idx, idx+size)
+	trace("Amt of bytes is " + bytes)
     val ba = new java.io.ByteArrayInputStream(bytes)
+	trace("Byte array " + ba)
     val in = new java.io.ObjectInputStream(ba)
     in.readObject()
   }
@@ -118,6 +124,7 @@ class StubCollector( max: Int ) extends Collector( max ) {
     trace( "## gcAlloc: allocating space for " + s )
     var asBytes = toBytes( s )
     val index = allocSize( asBytes.size + metadataSize )
+	trace("In stub gcAlloc this is storable" + s)
     s match {
       case m: MayMutate => {
         m.whereAllocated = index
@@ -259,6 +266,17 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     // traversing 'gEnv' that you've already updated (so don't trace
     // it, because it will already point into 'to space')
 	
+	trace("in do GC this is gEnv " + gEnv + " this is gEnv.env " + gEnv.env)
+	var sEnv = gEnv.env.toSet //get id of multiples
+	//var lEnv = sEnv.toList
+	sEnv.foreach( i => trace("in doGC this is the set " + i) ) 
+						// i match{
+						// case x : ( String, cs162.miniJS.domains.Domains.Ref ) => { traceCopy(Address(x. cs162.miniJS.domains.Domains.Ref)) }
+						// case _ => ()
+						//})
+						
+	//call traceCopy and update address
+	//swap spaces here
 	trace("In doGC() what is in gEnv " + gEnv)
 	
   }
@@ -300,10 +318,11 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
   def gcAlloc( s: Storable ): Address = {
     trace( "## gcAlloc: allocating space for " + s )
     
-    val asBytes = toBytes( s )
+    var asBytes = toBytes( s )
     val objSize = asBytes.size + getPadding(s)
     val fullSize =  metadataSize + objSize
-    
+    doGC()
+	
     // FILL ME IN
     //
     // HINTS: here are the steps:
@@ -316,26 +335,43 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     //    2c. if not, throw OOM exception
     // 3. write the object to memory (including meta-data)
     // 4. return the address of the object
-	
-	trace("In gcAlloc need " + fullSize)
-	//check if from space has enough memory
-	if(fullSize > (toStart-fromStart)){
-		//collect heap
-		//check mem now
-		//throw OOM exception
-		throw OOM
+
+    val postBump = bumpPointer + fullSize
+    if ( postBump >= (toStart-fromStart) ){
+		//collect heap -> doGC()
+		if(postBump > (toStart-fromStart)){
+			throw OOM
+		}
 	}
-	else {
-		writeObjectBytes(fromStart + fullSize, asBytes)
-		Address(fromStart + fullSize)
-	}
+	  val index = bumpPointer //this is the index
+	  bumpPointer = postBump
 	
+	trace("This is storable " + s)
+	  s match {
+      case m: MayMutate => {
+        m.whereAllocated = index
+        val newAsBytes = toBytes( m )
+        assert( asBytes.length == newAsBytes.length )
+        asBytes = newAsBytes ++ (0 until 50).map(_.toByte)
+      }
+      case _ => ()
+    }	
+
+	writeInt( index, fullSize)
+    writeBytes( index + 5, asBytes)
+	//writeObjectBytes(index - 1, asBytes)
+	
+		trace( "## gcAlloc: allocated " + (asBytes.size + metadataSize) + 
+           "bytes starting at addr " + index )
+		   
+	Address(index)
   } // gcAlloc
   
   // GC Read function
   def gcRead( a: Address ): Storable = {
     trace( "## gcRead: reading " + a )
     assert(validAddress( a )) 
+	trace("a.loc is " + a.loc)
     val retval = readObject( a.loc )
     trace( "## gcRead: result == " + retval )
     retval
