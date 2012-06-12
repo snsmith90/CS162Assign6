@@ -275,7 +275,8 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 							case ( s: String, n: Int ) => { 
 								trace("Getting address " + gStore.refMap.get(n))
 								gStore.refMap.get(n) match {
-									case Some(a:Address) => { traceCopy(a) 
+									case Some(a:Address) => { val newAdd = traceCopy(a) //update refMap with new address? how?
+																updateAddress(a, Address(newAdd))
 										}
 									case _ => ()
 									}
@@ -284,12 +285,12 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 						})
 						
 	//call traceCopy and update address
-	//swap spaces here
+	//swap spaces here ?? Is this done correctly??
 	trace("In doGC() what is in gEnv " + gEnv)
-	val temp = fromStart
-	fromStart = toStart
-	toStart = temp
-	bumpPointer = fromStart
+	//val temp = fromStart
+	//fromStart = toStart
+	//toStart = temp
+	bumpPointer = 0
   }
   
   // recursively copies from the given address
@@ -331,18 +332,27 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 		val asBytes = toBytes(o)
 		val objSize = asBytes.size + getPadding(o)
 		val fullSize =  metadataSize + objSize
-		//writeInt( bumpPointer, fullSize) //is this writing the object?
-		writeBytes( bumpPointer + 5, asBytes)
+		writeBytes( bumpPointer + 5, asBytes) //allocate space for object //do we need the + 5
+		val postBump = bumpPointer
+		bumpPointer = bumpPointer + fullSize
 		trace("In traceCopy past writeBytes")
-		trace("In traceCopy object is " + o)
-		//rec trace object's pointer addr
-		trace("Reading forwarding addr " + readForwardingAddress(a.loc))
-		val newAddr = traceCopy(Address(readForwardingAddress(a.loc) + 2))
-		setForwardingAddress(a.loc, newAddr)
-		//writeInt goes here
-		writeInt( bumpPointer, fullSize)
-		val nAddr = bumpPointer
-		bumpPointer = bumpPointer + fullSize //return new address
+		//trace("In traceCopy object is " + o)
+		o match{
+			case c :CloV => { trace("TraceCopy CloV") } //Call trace copy on Env? 
+			case l :ListCons => { trace("TraceCopy ListCons")
+									val newAdd = traceCopy(l.next)  //what do we do with returned address
+									updateAddress(l.next, Address(newAdd)) }
+			case ob :ObjectV => { trace("TraceCopy ObjectV")
+									val newAdd = traceCopy(ob.head)
+									updateAddress(ob.head, Address(newAdd)) }
+			case a :Address => { trace("TraceCopy Address")
+									val newAdd = traceCopy(Address(a.loc))
+									updateAddress(a, Address(newAdd)) }
+			case _ => trace("TraceCopy object doesn't point to an address")
+		}
+		writeInt( postBump, fullSize) 
+		val nAddr = postBump
+		trace("End of TraceCopy")
 		nAddr
 	}
 		
@@ -375,6 +385,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     if ( postBump >= (toStart-fromStart) ){
 		doGC()
 		//collect heap -> doGC()
+		val postBump = bumpPointer + fullSize
 		if(postBump > (toStart-fromStart)){
 			throw OOM
 		}
