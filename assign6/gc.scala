@@ -289,7 +289,9 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 	val temp = fromStart
 	fromStart = toStart
 	toStart = temp
-	bumpPointer = 0 //fix this (could be mid)
+	trace("This is toStart " + toStart)
+	trace("Setting bumpPointer to fromStart " + fromStart)
+	bumpPointer = fromStart //fix this (could be mid)
   }
   
   // recursively copies from the given address
@@ -339,31 +341,31 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 		o match{
 			case c :CloV => { trace("TraceCopy CloV") } //Call trace copy on Env? 
 			case l :ListCons => { trace("TraceCopy ListCons")
-									/*listCons.value match{
+									l.value match{
 										case ( sr: String, so: Storable ) => {
 																			so match {
 																				case a :Address => { trace("TraceCopy Address")
 																									val newAdd = traceCopy(Address(a.loc))
 																									a.loc = newAdd
-																									//updateAddress(a, Address(newAdd)) }
+																									 }
 																				case _ => trace("TraceCopy object ListCons doesn't point to an address")
 																			}}
 										case _ => ()
-									}*/
+									}
 									val newAdd = traceCopy(l.next)  //what do we do with returned address
 									l.next.loc = newAdd
-									//updateAddress(l.next, Address(newAdd)) }
+									 }
 			case ob :ObjectV => { trace("TraceCopy ObjectV")
 									val newAdd = traceCopy(ob.head)
 									ob.head.loc = newAdd
-									//updateAddress(ob.head, Address(newAdd)) }
+									 }
 			case a :Address => { trace("TraceCopy Address")
 									val newAdd = traceCopy(Address(a.loc))
 									a.loc = newAdd
-									//updateAddress(a, Address(newAdd)) }
+									 }
 			case _ => trace("TraceCopy object doesn't point to an address")
 		}
-		setForwardingAddress( postBump, a )
+		setForwardingAddress( postBump, a.loc )
 		writeInt( postBump, fullSize) 
 		val nAddr = postBump
 		trace("End of TraceCopy")
@@ -395,12 +397,41 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     // 4. return the address of the object
 
     val postBump = bumpPointer + fullSize
-    if ( postBump >= (toStart-fromStart) ){
-		doGC()
-		//collect heap -> doGC()
-		val postBump = bumpPointer + fullSize
-		if(postBump > (toStart-fromStart)){
-			throw OOM
+	trace("Checking memory " + scala.math.abs(toStart-fromStart) + " need " + fullSize)
+	if ( fromStart == 0 ) {
+		if ( postBump >= ( heapSize / 2 ) ){
+			doGC()
+			//collect heap -> doGC()
+			val postBump = bumpPointer + fullSize
+			trace("Checking memory " + scala.math.abs(toStart-fromStart) + " need " + fullSize)
+			if( fromStart == 0) {
+				if(postBump > ( heapSize / 2 )){
+					throw OOM
+				}
+			}
+			else {
+				if(postBump > ( heapSize )){
+					throw OOM
+				}
+			}
+		}
+	}
+	else {
+		if ( postBump >= ( heapSize ) ){
+			doGC()
+			//collect heap -> doGC()
+			val postBump = bumpPointer + fullSize
+			trace("Checking memory " + scala.math.abs(toStart-fromStart) + " need " + fullSize)
+			if( fromStart == 0) {
+				if(postBump > ( heapSize / 2 )){
+					throw OOM
+				}
+			}
+			else {
+				if(postBump > ( heapSize )){
+					throw OOM
+				}
+			}
 		}
 	}
 	  val index = bumpPointer //this is the index
