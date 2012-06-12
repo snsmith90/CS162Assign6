@@ -276,8 +276,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 								trace("Getting address " + gStore.refMap.get(n))
 								gStore.refMap.get(n) match {
 									case Some(a:Address) => { val newAdd = traceCopy(a) //update refMap with new address? how?
-																updateAddress(a, Address(newAdd))
-										}
+																a.loc = newAdd}
 									case _ => ()
 									}
 								}
@@ -287,10 +286,10 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 	//call traceCopy and update address
 	//swap spaces here ?? Is this done correctly??
 	trace("In doGC() what is in gEnv " + gEnv)
-	//val temp = fromStart
-	//fromStart = toStart
-	//toStart = temp
-	bumpPointer = 0
+	val temp = fromStart
+	fromStart = toStart
+	toStart = temp
+	bumpPointer = 0 //fix this (could be mid)
   }
   
   // recursively copies from the given address
@@ -324,7 +323,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 	
 	trace("In traceCopy is copied? " + isCopied(a.loc))
 	if(isCopied(a.loc)) {
-		bumpPointer
+		readForwardingAddress( bumpPointer )
 	}
 	else {
 		val o = readObject(a.loc)
@@ -332,7 +331,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 		val asBytes = toBytes(o)
 		val objSize = asBytes.size + getPadding(o)
 		val fullSize =  metadataSize + objSize
-		writeBytes( bumpPointer + 5, asBytes) //allocate space for object //do we need the + 5
+		writeBytes( bumpPointer + 5, asBytes) //allocate space for object
 		val postBump = bumpPointer
 		bumpPointer = bumpPointer + fullSize
 		trace("In traceCopy past writeBytes")
@@ -340,22 +339,36 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 		o match{
 			case c :CloV => { trace("TraceCopy CloV") } //Call trace copy on Env? 
 			case l :ListCons => { trace("TraceCopy ListCons")
+									/*listCons.value match{
+										case ( sr: String, so: Storable ) => {
+																			so match {
+																				case a :Address => { trace("TraceCopy Address")
+																									val newAdd = traceCopy(Address(a.loc))
+																									a.loc = newAdd
+																									//updateAddress(a, Address(newAdd)) }
+																				case _ => trace("TraceCopy object ListCons doesn't point to an address")
+																			}}
+										case _ => ()
+									}*/
 									val newAdd = traceCopy(l.next)  //what do we do with returned address
-									updateAddress(l.next, Address(newAdd)) }
+									l.next.loc = newAdd
+									//updateAddress(l.next, Address(newAdd)) }
 			case ob :ObjectV => { trace("TraceCopy ObjectV")
 									val newAdd = traceCopy(ob.head)
-									updateAddress(ob.head, Address(newAdd)) }
+									ob.head.loc = newAdd
+									//updateAddress(ob.head, Address(newAdd)) }
 			case a :Address => { trace("TraceCopy Address")
 									val newAdd = traceCopy(Address(a.loc))
-									updateAddress(a, Address(newAdd)) }
+									a.loc = newAdd
+									//updateAddress(a, Address(newAdd)) }
 			case _ => trace("TraceCopy object doesn't point to an address")
 		}
+		setForwardingAddress( postBump, a )
 		writeInt( postBump, fullSize) 
 		val nAddr = postBump
 		trace("End of TraceCopy")
 		nAddr
-	}
-		
+	}	
 	
   }
   
