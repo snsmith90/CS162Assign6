@@ -78,9 +78,9 @@ abstract class Collector( val maxSize: Int ) {
   def readObject(idx:Int, size:Int) : Object = {
 	trace("In read obj")
     val bytes = heap.slice(idx, idx+size)
-	trace("Amt of bytes is " + bytes)
+	//trace("Amt of bytes is " + bytes)
     val ba = new java.io.ByteArrayInputStream(bytes)
-	trace("Byte array " + ba)
+	//trace("Byte array " + ba)
     val in = new java.io.ObjectInputStream(ba)
     in.readObject()
   }
@@ -266,19 +266,30 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     // traversing 'gEnv' that you've already updated (so don't trace
     // it, because it will already point into 'to space')
 	
+	bumpPointer = toStart
 	trace("in do GC this is gEnv " + gEnv + " this is gEnv.env " + gEnv.env)
+	trace("In doGC this is the gStore " +gStore.refMap)
 	var sEnv = gEnv.env.toSet //get id of multiples
 	//var lEnv = sEnv.toList
-	sEnv.foreach( i => trace("in doGC this is the set " + i) ) 
-						// i match{
-						// case x : ( String, cs162.miniJS.domains.Domains.Ref ) => { traceCopy(Address(x. cs162.miniJS.domains.Domains.Ref)) }
-						// case _ => ()
-						//})
+	sEnv.foreach( i => i match{
+							case ( s: String, n: Int ) => { 
+								trace("Getting address " + gStore.refMap.get(n))
+								gStore.refMap.get(n) match {
+									case Some(a:Address) => { traceCopy(a) 
+										}
+									case _ => ()
+									}
+								}
+						 case _ => ()
+						})
 						
 	//call traceCopy and update address
 	//swap spaces here
 	trace("In doGC() what is in gEnv " + gEnv)
-	
+	val temp = fromStart
+	fromStart = toStart
+	toStart = temp
+	bumpPointer = fromStart
   }
   
   // recursively copies from the given address
@@ -309,8 +320,33 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     //
     // 6. now write the updated object to its address in 'to space'
     //    and return its new address location
-	trace("In traceCopy ")
-	0
+	
+	trace("In traceCopy is copied? " + isCopied(a.loc))
+	if(isCopied(a.loc)) {
+		bumpPointer
+	}
+	else {
+		val o = readObject(a.loc)
+		setCopied(a.loc)
+		val asBytes = toBytes(o)
+		val objSize = asBytes.size + getPadding(o)
+		val fullSize =  metadataSize + objSize
+		//writeInt( bumpPointer, fullSize) //is this writing the object?
+		writeBytes( bumpPointer + 5, asBytes)
+		trace("In traceCopy past writeBytes")
+		trace("In traceCopy object is " + o)
+		//rec trace object's pointer addr
+		trace("Reading forwarding addr " + readForwardingAddress(a.loc))
+		val newAddr = traceCopy(Address(readForwardingAddress(a.loc) + 2))
+		setForwardingAddress(a.loc, newAddr)
+		//writeInt goes here
+		writeInt( bumpPointer, fullSize)
+		val nAddr = bumpPointer
+		bumpPointer = bumpPointer + fullSize //return new address
+		nAddr
+	}
+		
+	
   }
   
   
@@ -321,7 +357,6 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     var asBytes = toBytes( s )
     val objSize = asBytes.size + getPadding(s)
     val fullSize =  metadataSize + objSize
-    doGC()
 	
     // FILL ME IN
     //
@@ -338,6 +373,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 
     val postBump = bumpPointer + fullSize
     if ( postBump >= (toStart-fromStart) ){
+		doGC()
 		//collect heap -> doGC()
 		if(postBump > (toStart-fromStart)){
 			throw OOM
@@ -358,20 +394,22 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     }	
 
 	writeInt( index, fullSize)
-    writeBytes( index + 5, asBytes)
-	//writeObjectBytes(index - 1, asBytes)
+    //writeBytes( index + 5, asBytes)
+	writeObjectBytes(index, asBytes)
 	
 		trace( "## gcAlloc: allocated " + (asBytes.size + metadataSize) + 
            "bytes starting at addr " + index )
-		   
+	
+		trace("Returning addr " + Address(index) + " to Env")
 	Address(index)
+	//gStore.alloc(s)
   } // gcAlloc
   
   // GC Read function
   def gcRead( a: Address ): Storable = {
     trace( "## gcRead: reading " + a )
     assert(validAddress( a )) 
-	trace("a.loc is " + a.loc)
+	//trace("a.loc is " + a.loc)
     val retval = readObject( a.loc )
     trace( "## gcRead: result == " + retval )
     retval
