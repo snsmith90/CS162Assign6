@@ -267,6 +267,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     // it, because it will already point into 'to space')
 	
 	bumpPointer = toStart
+	trace("****************")
 	trace("in do GC this is gEnv " + gEnv + " this is gEnv.env " + gEnv.env)
 	trace("In doGC this is the gStore " +gStore.refMap)
 	var sEnv = gEnv.env.toSet //get id of multiples
@@ -285,13 +286,14 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 						
 	//call traceCopy and update address
 	//swap spaces here ?? Is this done correctly??
-	trace("In doGC() what is in gEnv " + gEnv)
+	trace("In after doGC() what is in gEnv " + gEnv)
+	trace("In after doGC this is the gStore " +gStore.refMap)
 	val temp = fromStart
 	fromStart = toStart
 	toStart = temp
 	trace("This is toStart " + toStart)
-	trace("Setting bumpPointer to fromStart " + fromStart)
-	bumpPointer = fromStart //fix this (could be mid)
+	trace("Setting bumpPointer " + bumpPointer)
+	//bumpPointer = fromStart //fix this (could be mid)
   }
   
   // recursively copies from the given address
@@ -333,13 +335,33 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 		val asBytes = toBytes(o)
 		val objSize = asBytes.size + getPadding(o)
 		val fullSize =  metadataSize + objSize
+		trace("TraceCopy bumpPointer " + bumpPointer)
 		writeBytes( bumpPointer + 5, asBytes) //allocate space for object
 		val postBump = bumpPointer
 		bumpPointer = bumpPointer + fullSize
 		trace("In traceCopy past writeBytes")
 		//trace("In traceCopy object is " + o)
 		o match{
-			case c :CloV => { trace("TraceCopy CloV") } //Call trace copy on Env? 
+			case c :CloV => { trace("TraceCopy CloV this is the Env " + c.env)
+							var sEnv = c.env.env.toSet //get id of multiples
+							//var lEnv = sEnv.toList
+							sEnv.foreach( i => i match{
+													case ( s: String, n: Int ) => { 
+														trace("Getting address " + gStore.refMap.get(n))
+														gStore.refMap.get(n) match {
+															case Some(a:Address) => { //val newAdd = traceCopy(a) //update refMap with new address? how?
+																						//a.loc = newAdd
+																						trace("CloV's address is " + a)	
+																						}
+															case _ => ()
+															}
+														}
+												 case _ => ()
+												})
+
+
+
+			} //Call trace copy on Env? 
 			case l :ListCons => { trace("TraceCopy ListCons")
 									l.value match{
 										case ( sr: String, so: Storable ) => {
@@ -365,6 +387,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 									 }
 			case _ => trace("TraceCopy object doesn't point to an address")
 		}
+		trace("TraceCopy postBump " + postBump)
 		setForwardingAddress( postBump, a.loc )
 		writeInt( postBump, fullSize) 
 		val nAddr = postBump
@@ -449,8 +472,8 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     }	
 
 	writeInt( index, fullSize)
-    //writeBytes( index + 5, asBytes)
-	writeObjectBytes(index, asBytes)
+    writeBytes( index + 5, asBytes)
+	//writeObjectBytes(index, asBytes)
 	
 		trace( "## gcAlloc: allocated " + (asBytes.size + metadataSize) + 
            "bytes starting at addr " + index )
