@@ -285,7 +285,8 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 						
 	//call traceCopy and update address
 	//swap spaces here ?? Is this done correctly??
-	trace("In doGC() what is in gEnv " + gEnv)
+	trace("In after doGC() what is in gEnv " + gEnv)
+	trace("In after doGC this is the gStore " +gStore.refMap)
 	val temp = fromStart
 	fromStart = toStart
 	toStart = temp
@@ -339,7 +340,7 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
 		trace("In traceCopy past writeBytes")
 		//trace("In traceCopy object is " + o)
 		o match{
-			case c :CloV => { trace("TraceCopy CloV") } //Call trace copy on Env? 
+			case c :CloV => { trace("TraceCopy CloV this is the Env " + c.env) } //Call trace copy on Env? 
 			case l :ListCons => { trace("TraceCopy ListCons")
 									l.value match{
 										case ( sr: String, so: Storable ) => {
@@ -449,8 +450,8 @@ class SemispaceCollector( heapSize: Int ) extends Collector( heapSize ) with Tra
     }	
 
 	writeInt( index, fullSize)
-    //writeBytes( index + 5, asBytes)
-	writeObjectBytes(index, asBytes)
+    writeBytes( index + 5, asBytes)
+	//writeObjectBytes(index, asBytes)
 	
 		trace( "## gcAlloc: allocated " + (asBytes.size + metadataSize) + 
            "bytes starting at addr " + index )
